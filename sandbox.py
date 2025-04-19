@@ -82,30 +82,60 @@ print(data.describe(include='all'))
 #dropar categorias que afetam pouco workclass, final_weight
 
 def clean_dataset(data):
-    # dropa colunas
     data = data.drop('final_weight', axis=1) # drops final_weight
     data = data.drop('workclass', axis=1) # drops workclass
     data = data.drop('education', axis=1) # drops education
     data = data.drop('relationship', axis=1) #drops  relationship
-    
-    #substituir nan pelo item mais comum (moda) em cada categoria
-    values = {'age' : 39.0, 'education_num' : 10.0, 
-              'capital_gain' : 1082.0, 'capital_loss' : 88.0} #'marital_status' : "Married-civ-spouse", occupation' : 'Prof-specialty',  'race' : 'White', 'sex' : 'Male', 'native_country' : 'United-States', 'income_class' : '<=50K.'
-    data = data.fillna(value=values) 
 
-    data['age'] = data['age']/90.0
-    data['education_num'] = data['education_num']/16.0
-    data['capital_gain'] = data['capital_gain']/99999.0
-    data['capital_loss'] = data['capital_loss']/3800.0
-    data['hours_per_week'] = data['hours_per_week']/99.0
+    data['income_class'] = data.income_class.str.rstrip('.').astype('category')
+
+    capital_mean = np.mean(data.capital_gain[data.capital_gain != 99999])
+    data['capital_gain'] = data['capital_gain'].replace(99999, capital_mean)
+    hours_per_week_mean = np.mean(data.hours_per_week[data.hours_per_week != 99])
+    data['hours_per_week'] = data['hours_per_week'].replace(99, hours_per_week_mean)
+
+    #data['workclass'] = data['workclass'].replace('?', 'Private')
+    data['occupation'] = data['occupation'].replace('?', 'Prof-specialty')
+
+    # condensa classe native_country
+    data['native_country'] = data['native_country'].replace('?', 'United-States')
+    data['native_country'] = data['native_country'].astype('category')
+    mode = data['native_country'].cat.codes.mode()
+    print(mode[0])
+    usa_map = lambda a : True if a == mode[0] else False
+
+    native_usa = data['native_country'].cat.codes.map(usa_map)
+    data = data.drop('native_country', axis=1)
+    data = pd.concat([data, native_usa], axis=1)
+    #normaliza valores numéricos
+    data['age'] = data['age']/90
+    data['education_num'] = data['education_num']/16
+    data['capital_gain'] = data['capital_gain']/41310.0
+    data['capital_loss'] = data['capital_loss']/4356.0
+    data['hours_per_week'] = data['hours_per_week']/98
+
+    # one hot enconding 
+    marital_oh = pd.get_dummies(data['marital_status'])
+    data = data.drop('marital_status', axis=1)
+    data = pd.concat([data, marital_oh]).reset_index(drop=True)
+
+    occupation_oh = pd.get_dummies(data['occupation'])
+    data = data.drop('occupation', axis=1)
+    data = pd.concat([data, occupation_oh]).reset_index(drop=True)
+
+    race_oh = pd.get_dummies(data['race'])
+    data = data.drop('race', axis=1)
+    data = pd.concat([data, race_oh]).reset_index(drop=True)
+
+    sex_oh = pd.get_dummies(data['sex'])
+    data = data.drop('sex',axis=1)
+    data = pd.concat([data, sex_oh]).reset_index(drop=True)
+    #drop duplicates 
+    data = data.drop_duplicates()
+
+    #saída 
     y = data['income_class']
-    data = data.drop('income_class', axis=1) 
-    #max age 90
-    #max ed num 16
-    #max capital_gain 100000
-    #max capital_loss 3800
-    #max hour week 100
-    data = data.dropna() # for now
+    data = data.drop('income_class', axis=1)
     return data, y
 
 
