@@ -101,12 +101,14 @@ def clean_dataset(data):
     data['native_country'] = data['native_country'].replace('?', 'United-States')
     data['native_country'] = data['native_country'].astype('category')
     mode = data['native_country'].cat.codes.mode()
-    print(mode[0])
     usa_map = lambda a : True if a == mode[0] else False
 
     native_usa = data['native_country'].cat.codes.map(usa_map)
     data = data.drop('native_country', axis=1)
-    data = pd.concat([data, native_usa], axis=1)
+    native_usa_df = pd.DataFrame(data={'native_usa': native_usa})
+    data = pd.concat([data, native_usa_df], axis=1)
+
+    data['marital_status'] = data['marital_status'].replace('?', 'Married-civ-spouse')
     #normaliza valores numéricos
     data['age'] = data['age']/90
     data['education_num'] = data['education_num']/16
@@ -115,21 +117,21 @@ def clean_dataset(data):
     data['hours_per_week'] = data['hours_per_week']/98
 
     # one hot enconding 
-    marital_oh = pd.get_dummies(data['marital_status'])
+    marital_oh = pd.get_dummies(data['marital_status'], dummy_na=False)
     data = data.drop('marital_status', axis=1)
-    data = pd.concat([data, marital_oh]).reset_index(drop=True)
+    data = pd.concat([data, marital_oh], axis=1)
 
     occupation_oh = pd.get_dummies(data['occupation'])
     data = data.drop('occupation', axis=1)
-    data = pd.concat([data, occupation_oh]).reset_index(drop=True)
+    data = pd.concat([data, occupation_oh], axis=1)
 
     race_oh = pd.get_dummies(data['race'])
     data = data.drop('race', axis=1)
-    data = pd.concat([data, race_oh]).reset_index(drop=True)
+    data = pd.concat([data, race_oh], axis=1)
 
     sex_oh = pd.get_dummies(data['sex'])
     data = data.drop('sex',axis=1)
-    data = pd.concat([data, sex_oh]).reset_index(drop=True)
+    data = pd.concat([data, sex_oh], axis=1)
     #drop duplicates 
     data = data.drop_duplicates()
 
@@ -141,28 +143,19 @@ def clean_dataset(data):
 
 clean_test_data, clean_test_label = clean_dataset(test_data)
 validation_data, validation_label = clean_dataset(train_data)
-print(clean_test_data.describe(include='all'))
-cat_arr = np.array(pd.Categorical(clean_test_data['marital_status']).categories)
-print(cat_arr)
+#forces bool -> int where it applies
 
-def distance(arr1, arr2):
-    ''' Objetos com atributos age, education_num, marital_status, '''
-    mse = 0
-    for i in range(len(arr1)):
-        if (isinstance(arr1[i], numbers.Number) and isinstance(arr2[i], numbers.Number)):
-            mse += (arr1[i] - arr2[i]) ** 2
-        else:
-            mse += 1 if arr1[i] != arr2[i] else 0
-    return mse
+print(validation_data.dtypes)
+print(validation_data.describe(include='all'))
+print(validation_data.head(10))
+neigh = KNeighborsClassifier(n_neighbors=3)
+neigh.fit(validation_data, validation_label)
+#a = validation_data.iloc[[14]]
+#print(neigh.predict(a))
+#print("predicting for line", a,"expected:", validation_label.iloc[[14]])
 
-neigh = KNeighborsClassifier(n_neighbors=3, metric=distance, algorithm='brute')
-neigh.fit(clean_test_data, clean_test_label)
-a = validation_data.iloc[[14]]
-print(neigh.predict(a))
-print("predicting for line", a,"expected:", validation_label.iloc[[14]])
-
-valid = neigh.predict(validation_data.head(500))
-matrix = confusion_matrix(validation_label.head(500), valid)
+valid = neigh.predict(clean_test_data)
+matrix = confusion_matrix(clean_test_label, valid)
 print(matrix)
 #agora vamos criar o knn
 
